@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script
+        src="https://cdn.jsdelivr.net/gh/kchapelier/fast-2d-poisson-disk-sampling@1.0.3/build/fast-poisson-disk-sampling.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet">
+    <style>
+        .planet {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            z-index: 10;
+            background-position: center;
+            position: absolute;
+        }
+
+        .moon {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 15;
+            background-position: center;
+            position: absolute;
+        }
+
+        .title {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            color: #ffffff;
+            text-shadow:
+                0 0 5px #0ff,
+                0 0 10px #0ff,
+                0 0 20px #0ff,
+                0 0 40px #0ff;
+            letter-spacing: 2px;
+            z-index: 100;
+            pointer-events: none;
+            animation: glow 30s infinite ease-in-out;
+        }
+
+        .fade {
+            animation: fade 1s none ease-in-out;
+        }
+
+        @keyframes fade {
+            0% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                text-shadow:
+                    0 0 5px #f0f,
+                    0 0 10px #f0f,
+                    0 0 20px #f0f,
+                    0 0 40px #f0f;
+            }
+
+            50% {
+                text-shadow:
+                    0 0 5px #0ff,
+                    0 0 10px #5ff,
+                    0 0 20px #5ff,
+                    0 0 40px #5ff;
+            }
+        }
+    </style>
+</head>
+
+<body style="background-color: black; overflow: hidden;">
+    <div id="container"></div>
+    <script>
+        const container = document.getElementById("container");
+        const canvas = document.createElement("canvas");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.position = "absolute";
+        canvas.style.top = 0;
+        canvas.style.zIndex = 0;
+        canvas.style.left = 0;
+        container.appendChild(canvas);
+        const ctx = canvas.getContext("2d");
+        const importantLinks = ["https://github.com/gabeStuk", "https://github.com/team4028", "https://github.com/gabeStuk/install-frc-software", "https://github.com/gabeStuk/PathFlip", "https://github.com/gabeStuk/FRC-Win-Rate-Calculator"]
+        const planetsDist = new FastPoissonDiskSampling({
+            shape: [window.innerWidth - 400, window.innerHeight - 400],
+            radius: Math.min(window.innerHeight, window.innerWidth) / 2,
+            tries: 30,
+        });
+        let planetPoints = planetsDist.fill();
+        while (planetPoints.length < importantLinks.length) {
+            planetsDist.reset();
+            planetPoints = planetsDist.fill();
+        }
+        importantLinks.forEach((l, i) => {
+            const planet = document.createElement("div");
+            planet.style.left = planetPoints[i][0] + "px";
+            planet.style.top = planetPoints[i][1] + "px";
+            planet.style.width = '200px';
+            planet.style.height = '200px';
+            planet.classList.add("planet");
+            planet.style.backgroundImage = `url(https://icons.duckduckgo.com/ip3/${new URL(l).host}.ico)`;
+            planet.dataset.link = l;
+            for (let i = 0; i < (Math.random() * 4); i++) {
+                createMoon(planet, ((i + 1) * 20) + 100, Math.random() * Math.PI * 2);
+            }
+            container.appendChild(planet);
+        });
+
+
+        function createMoon(parentPlanet, orbitRad, startTheta) {
+            const moon = document.createElement("div");
+            moon.style.backgroundColor = '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+            const cx = parseFloat(parentPlanet.style.left) + parseFloat(parentPlanet.style.width) / 2;
+            const cy = parseFloat(parentPlanet.style.top) + parseFloat(parentPlanet.style.height) / 2;
+            let theta = startTheta;
+            moon.classList.add("moon");
+            setInterval(() => {
+                theta += 0.01;
+                moon.style.left = (cx + orbitRad * Math.cos(theta)) - parseFloat(getComputedStyle(moon).width) / 2 + "px";
+                moon.style.top = (cy + orbitRad * Math.sin(theta)) - parseFloat(getComputedStyle(moon).height) / 2 + "px";
+            }, 10);
+            container.appendChild(moon);
+        }
+
+        const stars = [];
+
+        function createStar(mass = 1, cx, cy) {
+            stars.push({
+                x: cx,
+                y: cy,
+                originX: cx,
+                originY: cy,
+                radius: 2.5,
+                mass,
+                xvel: 0,
+                yvel: 0,
+                xaccel: 0,
+                yaccel: 0,
+                netforcex: 0,
+                netforcey: 0,
+            });
+        }
+
+        function applyForceStar(star, fx, fy) {
+            star.netforcex += fx;
+            star.netforcey += fy;
+        }
+
+        function updateStar(star) {
+            const staticThreshold = 0.3;
+            const kineticFriction = 0.5;
+            const velocityMag = Math.hypot(star.xvel, star.yvel);
+            const velocityAngle = Math.atan2(star.yvel, star.xvel);
+            const forceMag = Math.hypot(star.netforcex, star.netforcey);
+            const springK = 0.5;
+
+            const dx = star.originX - star.x;
+            const dy = star.originY - star.y;
+
+            const springForceX = Math.min(5, Math.max(-5, springK * dx / 20));
+            const springForceY = Math.min(5, Math.max(-5, springK * dy / 20));
+
+            let fric = [];
+
+            if (velocityMag < 0.01) {
+                if (forceMag < staticThreshold) {
+                    star.netforcex = 0;
+                    star.netforcey = 0;
+                    star.xaccel = 0;
+                    star.yaccel = 0;
+                    star.xvel = 0;
+                    star.yvel = 0;
+                } else {
+                    star.netforcex -= kineticFriction * star.xvel;
+                    star.netforcey -= kineticFriction * star.yvel;
+                    fric = [-kineticFriction * star.xvel, -kineticFriction * star.yvel];
+                }
+            } else {
+                star.netforcex += -Math.sign(star.xvel) * Math.min(
+                    Math.abs(kineticFriction * star.xvel),
+                    Math.abs(star.xvel) * star.mass
+                );
+                star.netforcey += -Math.sign(star.yvel) * Math.min(
+                    Math.abs(kineticFriction * star.yvel),
+                    Math.abs(star.yvel) * star.mass
+                );
+                fric = [-Math.sign(star.xvel) * Math.min(
+                    Math.abs(kineticFriction * star.xvel),
+                    Math.abs(star.xvel) * star.mass
+                ), -Math.sign(star.yvel) * Math.min(
+                    Math.abs(kineticFriction * star.yvel),
+                    Math.abs(star.yvel) * star.mass
+                )];
+            }
+
+            star.netforcex += springForceX;
+            star.netforcey += springForceY;
+
+            if (velocityMag > 10) {
+                star.xaccel = fric[0] / star.mass;
+                star.yaccel = fric[1] / star.mass;
+                star.xvel = 10 * Math.cos(velocityAngle);
+                star.yvel = 10 * Math.sin(velocityAngle);
+            } else {
+                star.xaccel = star.netforcex / star.mass;
+                star.yaccel = star.netforcey / star.mass;
+            }
+
+
+            star.xvel += star.xaccel;
+            star.yvel += star.yaccel;
+
+            if (Math.abs(star.xvel) < 0.01) star.xvel = 0, star.xaccel = 0;
+            if (Math.abs(star.yvel) < 0.01) star.yvel = 0, star.yaccel = 0;
+
+            if (Math.hypot(star.x - star.originX, star.y - star.originY) > window.innerWidth)
+                console.log(star);
+
+            star.x += star.xvel;
+            star.y += star.yvel;
+
+            star.netforcex = 0;
+            star.netforcey = 0;
+        }
+
+        const spaceship = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            xvel: 0,
+            yvel: 0,
+            xaccel: 0,
+            yaccel: 0,
+            netforcex: 0,
+            netforcey: 0,
+            mass: 40,
+            size: 10,
+        };
+
+        function createFloatingText(text, x, y, options = {}) {
+            const el = document.createElement('div');
+            el.textContent = text;
+            Object.assign(el.style, {
+                position: 'absolute',
+                left: x + 'px',
+                top: y + 'px',
+                pointerEvents: 'none',
+                fontWeight: options.bold ? 'bold' : 'normal',
+                color: options.color || 'white',
+                fontSize: options.size || '20px',
+                opacity: '1',
+                transition: 'transform 1.5s ease-out, opacity 1.5s ease-out',
+                userSelect: 'none',
+                willChange: 'transform, opacity',
+                zIndex: '20',
+            });
+
+            container.appendChild(el);
+
+            return el;
+        }
+
+        let maxSpaceshipVel = 10;
+
+        function updateSpaceship(ship) {
+            const staticThreshold = 0.1;
+            const kineticFriction = 0.2;
+
+            const velocityMag = Math.hypot(ship.xvel, ship.yvel);
+            const velocityAngle = Math.atan2(ship.yvel, ship.xvel);
+            const forceMag = Math.hypot(ship.netforcex, ship.netforcey);
+
+            if (velocityMag < 0.01) {
+                if (forceMag < staticThreshold) {
+                    ship.netforcex = 0;
+                    ship.netforcey = 0;
+                    ship.xaccel = 0;
+                    ship.yaccel = 0;
+                    ship.xvel = 0;
+                    ship.yvel = 0;
+                } else {
+                    ship.netforcex -= kineticFriction * ship.xvel;
+                    ship.netforcey -= kineticFriction * ship.yvel;
+                }
+            } else {
+                ship.netforcex += -Math.sign(ship.xvel) * Math.min(
+                    Math.abs(kineticFriction * ship.xvel),
+                    Math.abs(ship.xvel) * ship.mass
+                );
+                ship.netforcey += -Math.sign(ship.yvel) * Math.min(
+                    Math.abs(kineticFriction * ship.yvel),
+                    Math.abs(ship.yvel) * ship.mass
+                );
+            }
+
+            if (velocityMag > maxSpaceshipVel) {
+                ship.xaccel = 0;
+                ship.yaccel = 0;
+                ship.xvel = maxSpaceshipVel * Math.cos(velocityAngle);
+                ship.yvel = maxSpaceshipVel * Math.sin(velocityAngle);
+            } else {
+                ship.xaccel = ship.netforcex / ship.mass;
+                ship.yaccel = ship.netforcey / ship.mass;
+            }
+
+            ship.xvel += ship.xaccel;
+            ship.yvel += ship.yaccel;
+
+            if (Math.abs(ship.xvel) < 0.01) ship.xvel = 0, ship.xaccel = 0;
+            if (Math.abs(ship.yvel) < 0.01) ship.yvel = 0, ship.yaccel = 0;
+
+            ship.x += ship.xvel;
+            ship.y += ship.yvel;
+
+            ship.x %= window.innerWidth;
+            ship.y %= window.innerHeight;
+            while (ship.x < 0) ship.x += window.innerWidth;
+            while (ship.y < 0) ship.y += window.innerHeight;
+
+            ship.netforcex = 0;
+            ship.netforcey = 0;
+        }
+
+        const keysDown = {};
+        const overrideKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Shift']);
+        document.addEventListener('keydown', e => {
+            keysDown[e.key] = true;
+            if (overrideKeys.has(e.key)) e.preventDefault();
+        });
+        document.addEventListener('keyup', e => {
+            keysDown[e.key] = false;
+            if (overrideKeys.has(e.key)) e.preventDefault();
+        });
+
+        function drawSpaceship(ship) {
+            const ctx = canvas.getContext("2d");
+            ctx.save();
+            ctx.translate(ship.x, ship.y);
+
+            const angle = Math.atan2(ship.yvel, ship.xvel) || 0;
+            ctx.rotate(angle);
+
+            ctx.beginPath();
+            ctx.moveTo(ship.size, 0);
+            ctx.lineTo(-ship.size / 2, ship.size / 2);
+            ctx.lineTo(-ship.size / 2, -ship.size / 2);
+            ctx.closePath();
+
+            ctx.fillStyle = "white";
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawStar(star) {
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+            ctx.fillStyle = "yellow";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(star.x, star.y);
+            ctx.lineTo(star.originX, star.originY);
+            ctx.lineWidth = 0.1;
+            ctx.strokeStyle = "white";
+            ctx.stroke();
+        }
+
+        function pointInRect(px, py, rect) {
+            return (px > rect.left &&
+                px < rect.right &&
+                py > rect.top &&
+                py < rect.bottom
+            );
+        }
+
+        let planetsHit = [];
+        let planetTexts = [];
+        function animate() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (const star of stars) {
+                const dx = star.x - spaceship.x;
+                const dy = star.y - spaceship.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 100) {
+                    const distR = 200 / dist;
+                    const distT = Math.atan2(dy, dx);
+                    applyForceStar(star, distR * Math.cos(distT), distR * Math.sin(distT));
+                }
+                updateStar(star);
+                drawStar(star);
+            }
+            let thrustX = 0, thrustY = 0;
+            let thrustMagnitude = 0.4;
+            if (keysDown['Shift']) {
+                thrustMagnitude *= 5;
+                maxSpaceshipVel = 20;
+            } else maxSpaceshipVel = 10;
+            if (keysDown['ArrowUp']) thrustY -= thrustMagnitude;
+            if (keysDown['ArrowDown']) thrustY += thrustMagnitude;
+            if (keysDown['ArrowLeft']) thrustX -= thrustMagnitude;
+            if (keysDown['ArrowRight']) thrustX += thrustMagnitude;
+            applyForceStar(spaceship, thrustX, thrustY);
+            updateSpaceship(spaceship);
+            drawSpaceship(spaceship);
+
+            requestAnimationFrame(animate);
+            for (const planet of document.getElementsByClassName("planet")) {
+                if (pointInRect(spaceship.x, spaceship.y, planet.getBoundingClientRect())) {
+                    if (!planetsHit.includes(planet)) {
+                        const rect = planet.getBoundingClientRect();
+                        const data = {
+                            link: planet.dataset.link,
+                            listener: (e) => {
+                                if (e.key === "e") {
+                                    window.open(planet.dataset.link, '_blank');
+                                }
+                            },
+                            obj: createFloatingText(`Press {e} to navigate to ${planet.dataset.link}`, rect.left + rect.width / 2, rect.top + rect.height / 2, {
+                                color: "white",
+                                bold: true,
+                                size: '24px',
+                            })
+                        }
+                        planetTexts.push(data);
+                        planetsHit.push(planet);
+                        window.addEventListener("keydown", data.listener);
+                    }
+                } else {
+                    planetsHit = planetsHit.filter(x => x !== planet);
+                    planetTexts.forEach(x => {
+                        if (x.link === planet.dataset.link) {
+                            x.obj.remove();
+                            window.removeEventListener("keydown", x.listener);
+                        }
+                    });
+                    planetTexts = planetTexts.filter(x => x.link !== planet.dataset.link);
+                }
+            }
+        }
+
+        animate();
+
+        // createStar(10);
+        var p = new FastPoissonDiskSampling({
+            shape: [window.innerWidth, window.innerHeight],
+            radius: 50,
+            tries: 20,
+        });
+        for (const point of p.fill()) {
+            createStar(10, point[0], point[1]);
+        }
+
+        const arrows = document.createElement("img");
+        arrows.src = "image.png";
+        arrows.style.position = "fixed";
+        arrows.style.zIndex = "10";
+        arrows.style.left = "50%";
+        arrows.style.top = "50%";
+        arrows.style.transform = "translate(-50%, calc(-50% - 50px)) scale(0.1)";
+        window.addEventListener("keydown", (e) => {
+            if (overrideKeys.has(e.key)) {
+                arrows.classList.add("fade");
+                setTimeout(() => arrows.remove(), 1000);
+            }
+        })
+        document.body.appendChild(arrows);
+
+        const h1 = document.createElement("h1");
+        h1.classList.add("title");
+        h1.textContent = "Gabe Stuk"
+        document.body.appendChild(h1);
+    </script>
+</body>
+
+</html>
