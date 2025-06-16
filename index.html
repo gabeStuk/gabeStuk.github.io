@@ -557,7 +557,7 @@
             arrows.style.top = "50%";
             arrows.style.transform = "translate(-50%, calc(-50% - 50px)) scale(0.1)";
             window.addEventListener("keydown", (e) => {
-                if (overrideKeys.has(e.key)) {
+                if (overrideKeys.has(e.key) && e.key !== "Shift") {
                     arrows.classList.add("fade");
                     setTimeout(() => arrows.remove(), 1000);
                 }
