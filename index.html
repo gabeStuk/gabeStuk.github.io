@@ -3,10 +3,18 @@
 
 <head>
     <script
-        src="https://cdn.jsdelivr.net/gh/kchapelier/fast-2d-poisson-disk-sampling@1.0.3/build/fast-poisson-disk-sampling.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.2/nipplejs.min.js"></script>
+        src="js-libs/fast-poisson-disk.js"></script>
+    <script src="js-libs/nipplejs.js"></script>
     <style>
+        /* https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap */
+        @font-face {
+            font-family: "Orbitron";
+            font-style: normal;
+            font-weight: 600;
+            font-display: swap;
+            src: url("font/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1nyxSmBoWgz.woff2") format('woff2');
+            unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+        }
         .planet {
             width: 200px;
             height: 200px;
@@ -130,7 +138,15 @@
         canvas.style.left = 0;
         container.appendChild(canvas);
         const ctx = canvas.getContext("2d");
-        const importantLinks = ["https://github.com/gabeStuk", "https://github.com/team4028", "https://github.com/gabeStuk/install-frc-software", "https://github.com/gabeStuk/PathFlip", "https://github.com/gabeStuk/SacredTreasure", "https://github.com/gabeStuk/FRC-Win-Rate-Calculator", "https://linkedin.com/in/gabestuk"]
+        const importantLinks = [
+            "https://github.com/gabeStuk",
+            "https://github.com/team4028",
+            "https://github.com/gabeStuk/install-frc-software",
+            "https://github.com/gabeStuk/PathFlip",
+            "https://github.com/gabeStuk/MythrilSoul",
+            "https://github.com/gabeStuk/FRC-Win-Rate-Calculator",
+            "https://linkedin.com/in/gabestuk"
+        ];
         const planetsDist = new FastPoissonDiskSampling({
             shape: [window.innerWidth - 400, window.innerHeight - 400],
             radius: Math.min(window.innerHeight, window.innerWidth) / 2.1,
