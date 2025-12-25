@@ -149,7 +149,7 @@
         ];
         const planetsDist = new FastPoissonDiskSampling({
             shape: [window.innerWidth - 400, window.innerHeight - 400],
-            radius: Math.min(window.innerHeight, window.innerWidth) / 2.1,
+            radius: Math.min(window.innerHeight, window.innerWidth) / 2.2,
             tries: 30,
         });
         let planetPoints = planetsDist.fill();
