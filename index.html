@@ -130,14 +130,27 @@
 
         const container = document.getElementById("container");
         const canvas = document.createElement("canvas");
+        const shipCanvas = document.createElement("canvas");
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
-        canvas.style.position = "absolute";
-        canvas.style.top = 0;
-        canvas.style.zIndex = 0;
-        canvas.style.left = 0;
+        Object.assign(canvas.style, {
+            position: "absolute",
+            top: 0,
+            zIndex: 0,
+            left: 0
+        });
+        shipCanvas.width = window.innerWidth;
+        shipCanvas.height = window.innerHeight;
+        Object.assign(shipCanvas.style, {
+            position: "absolute",
+            top: 0,
+            zIndex: 999,
+            left: 0
+        });
         container.appendChild(canvas);
+        container.appendChild(shipCanvas);
         const ctx = canvas.getContext("2d");
+        const shipCtx = shipCanvas.getContext("2d");
         const importantLinks = [
             "https://github.com/gabeStuk",
             "https://github.com/team4028",
@@ -298,8 +311,8 @@
         }
 
         const spaceship = {
-            x: canvas.width / 2,
-            y: canvas.height / 2,
+            x: shipCanvas.width / 2,
+            y: shipCanvas.height / 2,
             xvel: 0,
             yvel: 0,
             xaccel: 0,
@@ -409,23 +422,22 @@
         });
 
         function drawSpaceship(ship) {
-            const ctx = canvas.getContext("2d");
-            ctx.save();
-            ctx.translate(ship.x, ship.y);
+            shipCtx.save();
+            shipCtx.translate(ship.x, ship.y);
 
             const angle = Math.atan2(ship.yvel, ship.xvel) || 0;
-            ctx.rotate(angle);
+            shipCtx.rotate(angle);
 
-            ctx.beginPath();
-            ctx.moveTo(ship.size, 0);
-            ctx.lineTo(-ship.size / 2, ship.size / 2);
-            ctx.lineTo(-ship.size / 2, -ship.size / 2);
-            ctx.closePath();
+            shipCtx.beginPath();
+            shipCtx.moveTo(ship.size, 0);
+            shipCtx.lineTo(-ship.size / 2, ship.size / 2);
+            shipCtx.lineTo(-ship.size / 2, -ship.size / 2);
+            shipCtx.closePath();
 
-            ctx.fillStyle = "white";
-            ctx.fill();
+            shipCtx.fillStyle = "white";
+            shipCtx.fill();
 
-            ctx.restore();
+            shipCtx.restore();
         }
 
         const isMobile = mobileAndTabletCheck();
@@ -456,6 +468,11 @@
         function animate() {
             ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            shipCtx.save();
+            shipCtx.globalCompositeOperation = "destination-out";
+            shipCtx.fillStyle = "rgba(0, 0, 0, 0.1)";
+            shipCtx.fillRect(0, 0, shipCanvas.width, shipCanvas.height);
+            shipCtx.restore();
 
             for (const star of stars) {
                 const dx = star.x - spaceship.x;
